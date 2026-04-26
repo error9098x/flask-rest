@@ -12,8 +12,8 @@ class UserResource(Resource):
     def get(self, user_id):
         conn = sqlite3.connect('api.db')
         cursor = conn.cursor()
-        query = f"SELECT * FROM users WHERE id = '{user_id}'"
-        cursor.execute(query)
+        query = "SELECT * FROM users WHERE id = ?"
+        cursor.execute(query, (user_id,))
         result = cursor.fetchone()
         conn.close()
         return {'user': result}
@@ -23,7 +23,7 @@ class AdminResource(Resource):
     def delete(self, user_id):
         conn = sqlite3.connect('api.db')
         cursor = conn.cursor()
-        cursor.execute(f"DELETE FROM users WHERE id = {user_id}")
+        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
         conn.close()
         return {'message': 'Deleted'}
@@ -37,8 +37,16 @@ class XMLResource(Resource):
 
 # Vulnerability 4: SSRF - unvalidated URL fetching
 class FetchResource(Resource):
+    ALLOWED_SCHEMES = {'http', 'https'}
+    ALLOWED_HOSTS = {'example.com', 'api.example.com'}
+
     def get(self):
         url = request.args.get('url')
+        parsed = requests.utils.urlparse(url)
+        if parsed.scheme not in self.ALLOWED_SCHEMES:
+            return {'error': 'Invalid URL scheme'}, 400
+        if parsed.hostname not in self.ALLOWED_HOSTS:
+            return {'error': 'Invalid URL host'}, 400
         response = requests.get(url)
         return {'content': response.text}
 
@@ -48,4 +56,4 @@ api.add_resource(XMLResource, '/parse')
 api.add_resource(FetchResource, '/fetch')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
